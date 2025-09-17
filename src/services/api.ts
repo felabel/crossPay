@@ -3,9 +3,9 @@ import { initialWallets, exchangeRates } from "@/lib/data";
 import type { Wallet, Transaction } from "@/lib/types";
 
 // In-memory "database"
-let wallets: Wallet[] = [...initialWallets];
-let transactionIdCounter = initialWallets.length + 1;
-let walletIdCounter = initialWallets.length + 1;
+let wallets: Wallet[] = [];
+let transactionIdCounter = 1;
+let walletIdCounter = 1;
 
 const randomDelay = () => new Promise(res => setTimeout(res, Math.random() * 1000 + 500));
 const shouldFail = () => Math.random() < 0.1; // 10% chance of failure
@@ -34,7 +34,7 @@ export async function depositFunds({ walletId, amount }: { walletId: string; amo
   return { ...wallet };
 }
 
-export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet, toWallet: Wallet }> {
+export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet, toWallet: Wallet, receivedAmount: number }> {
     await randomDelay();
     if (shouldFail()) {
         throw new Error("Currency swap failed due to a network error.");
@@ -62,7 +62,7 @@ export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromW
     fromWallet.balance -= amount;
     toWallet.balance += receivedAmount;
 
-    return { fromWallet: { ...fromWallet }, toWallet: { ...toWallet } };
+    return { fromWallet: { ...fromWallet }, toWallet: { ...toWallet }, receivedAmount };
 }
 
 export async function sendFunds({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet }> {

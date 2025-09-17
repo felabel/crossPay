@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import type { Wallet, Transaction, Currency } from "@/lib/types";
 import { initialWallets, initialTransactions } from "@/lib/data";
 import * as api from "@/services/api";
@@ -18,14 +18,48 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [wallets, setWallets] = useState<Wallet[]>(initialWallets);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>(
     initialTransactions
   );
 
+  useEffect(() => {
+    // This effect runs once on mount to populate initial wallets and create corresponding deposit transactions.
+    // This simulates starting with pre-existing wallets and having a transaction history for them.
+    const initializeAppData = async () => {
+      const initialWalletPromises = initialWallets.map(async (wallet) => {
+        const newWallet = await api.createWallet(wallet);
+        if (newWallet.balance > 0) {
+          const newTransaction = await api.createTransaction({
+            walletId: newWallet.id,
+            amount: newWallet.balance,
+            type: 'Deposit',
+            status: 'Completed',
+            description: 'Initial balance'
+          });
+          setTransactions(prev => [newTransaction, ...prev]);
+        }
+        return newWallet;
+      });
+      const createdWallets = await Promise.all(initialWalletPromises);
+      setWallets(createdWallets);
+    };
+
+    initializeAppData();
+  }, []);
+
   const addWallet = async (wallet: Omit<Wallet, "id">) => {
     const newWallet = await api.createWallet(wallet);
     setWallets((prev) => [...prev, newWallet]);
+     if (wallet.balance > 0) {
+      await addTransaction({
+        walletId: newWallet.id,
+        amount: wallet.balance,
+        type: 'Deposit',
+        status: 'Completed',
+        description: 'Initial balance'
+      });
+    }
   };
 
   const addTransaction = async (transaction: Omit<Transaction, "id" | "date">) => {
@@ -39,7 +73,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const swapCurrency = async (args: { fromWalletId: string; toWalletId: string; amount: number; }) => {
-    const { fromWallet, toWallet } = await api.swapCurrency(args);
+    const { fromWallet, toWallet, receivedAmount } = await api.swapCurrency(args);
     setWallets(currentWallets => currentWallets.map(w => {
       if (w.id === fromWallet.id) return fromWallet;
       if (w.id === toWallet.id) return toWallet;
@@ -55,7 +89,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
      await addTransaction({
       walletId: toWallet.id,
-      amount: toWallet.balance - (wallets.find(w => w.id === toWallet.id)?.balance || 0),
+      amount: receivedAmount,
       type: 'Swap',
       status: 'Completed',
       description: `Swap from ${fromWallet.currency.code}`

@@ -1,7 +1,9 @@
 export type Currency = {
-  code: string;
-  name: string;
+  id: string; // Used for API calls, e.g., 'bitcoin'
+  code: string; // e.g., 'BTC'
+  name: string; // e.g., 'Bitcoin'
   symbol: string;
+  isCrypto?: boolean;
 };
 
 export type Wallet = {

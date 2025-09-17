@@ -33,46 +33,62 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshRates = useCallback(async () => {
     try {
-      // Fetch base rates from the live API (base is USD)
-      const response = await fetch('https://open.er-api.com/v6/latest/USD');
-      if (!response.ok) {
-        throw new Error('Failed to fetch exchange rates');
-      }
-      const data = await response.json();
-      const baseRates = data.rates as Record<string, number>;
-
-      // Create the full matrix of currency pairs that the app expects
-      const allRates: LiveRates = {};
       const allCurrencies = currencies.map(c => c.code);
+      const cryptoCurrencies = currencies.filter(c => c.isCrypto).map(c => c.id);
+      const fiatCurrencies = currencies.filter(c => !c.isCrypto).map(c => c.code);
 
+      // 1. Fetch base rates for FIAT currencies from ER-API (base is USD)
+      const fiatResponse = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (!fiatResponse.ok) throw new Error('Failed to fetch fiat exchange rates');
+      const fiatData = await fiatResponse.json();
+      const baseFiatRates = fiatData.rates as Record<string, number>;
+      baseFiatRates['USD'] = 1; // Add USD to itself
+
+      // 2. Fetch rates for CRYPTO currencies from CoinGecko (base is USD)
+      let cryptoRatesInUSD: Record<string, number> = {};
+      if (cryptoCurrencies.length > 0) {
+        const cryptoResponse = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoCurrencies.join(',')}&vs_currencies=usd`);
+        if (!cryptoResponse.ok) throw new Error('Failed to fetch crypto exchange rates');
+        const cryptoData = await cryptoResponse.json();
+        cryptoRatesInUSD = Object.keys(cryptoData).reduce((acc, key) => {
+            const currency = currencies.find(c => c.id === key);
+            if (currency) {
+                acc[currency.code] = cryptoData[key].usd;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+      }
+
+      // 3. Merge all rates into a single object with USD as the base
+      const allRatesInUSD = { ...baseFiatRates, ...cryptoRatesInUSD };
+      
+      // 4. Create the full matrix of all currency pairs
+      const allRates: LiveRates = {};
       for (const from of allCurrencies) {
         for (const to of allCurrencies) {
-          if (from === to) continue;
-          // Example: to convert from EUR to JPY: (amount * base_usd_to_jpy) / base_usd_to_eur
-          const fromRate = baseRates[from] || 1; // Default to 1 if currency is USD itself
-          const toRate = baseRates[to] || 1;
+          if (from === to) {
+            allRates[`${from}-${to}`] = 1;
+            continue;
+          };
+          const fromRate = allRatesInUSD[from];
+          const toRate = allRatesInUSD[to];
+          
           if (fromRate && toRate) {
-             if (from === 'USD') {
-                allRates[`${from}-${to}`] = toRate;
-             } else {
-                allRates[`${from}-${to}`] = toRate / fromRate;
-             }
+             allRates[`${from}-${to}`] = toRate / fromRate;
           }
         }
       }
       
       setExchangeRates(allRates);
-      api.setLiveRates(allRates); // Pass the live rates to the mock API service
+      api.setLiveRates(allRates);
 
     } catch (error) {
       console.error("Failed to fetch live exchange rates:", error);
-      // Optionally set a toast or notification for the user
     }
   }, []);
 
 
   useEffect(() => {
-    // Fetch initial rates on load
     refreshRates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,7 +113,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const swapCurrency = async (args: { fromWalletId: string; toWalletId: string; amount: number; }) => {
-    // Ensure latest rates are used for swap
     await refreshRates();
 
     const { fromWallet, toWallet, receivedAmount } = await api.swapCurrency(args);

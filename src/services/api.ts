@@ -1,15 +1,20 @@
 // This file mocks a remote API.
-import { currencies } from "@/lib/data";
 import type { Wallet, Transaction } from "@/lib/types";
-import { getLiveRates, GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
 
 // In-memory "database"
 let wallets: Wallet[] = [];
 let transactionIdCounter = 1;
 let walletIdCounter = 1;
 
+// This will be populated by the context with live data
+let liveExchangeRates: Record<string, number> | null = null;
+
 const randomDelay = () => new Promise(res => setTimeout(res, Math.random() * 1000 + 500));
 const shouldFail = () => Math.random() < 0.1; // 10% chance of failure
+
+export function setLiveRates(rates: Record<string, number>) {
+  liveExchangeRates = rates;
+}
 
 export async function createWallet(walletData: Omit<Wallet, 'id'>): Promise<Wallet> {
   await randomDelay();
@@ -52,11 +57,12 @@ export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromW
         throw new Error("Insufficient funds for the swap.");
     }
 
-    const allCurrencies = currencies.map(c => c.code);
-    const exchangeRates = await getLiveRates({ currencies: allCurrencies });
+    if (!liveExchangeRates) {
+        throw new Error("Exchange rates have not been loaded yet.");
+    }
 
-    const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}` as keyof GetLiveRatesOutput;
-    const rate = exchangeRates[rateKey];
+    const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
+    const rate = liveExchangeRates[rateKey];
 
     if (!rate) {
         throw new Error(`Exchange rate not available for ${fromWallet.currency.code} to ${toWallet.currency.code}.`);

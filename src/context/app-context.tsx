@@ -4,13 +4,15 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import type { Wallet, Transaction, Currency } from "@/lib/types";
 import { initialWallets } from "@/lib/data";
 import * as api from "@/services/api";
-import { getLiveRates, GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
 import { currencies } from "@/lib/data";
+
+// This type is now defined here since we removed the Genkit flow
+export type LiveRates = Record<string, number>;
 
 interface AppContextType {
   wallets: Wallet[];
   transactions: Transaction[];
-  exchangeRates: GetLiveRatesOutput | null;
+  exchangeRates: LiveRates | null;
   addWallet: (wallet: Omit<Wallet, "id">) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id" | "date">) => Promise<void>;
   updateWalletBalance: (walletId: string, amount: number) => Promise<void>;
@@ -24,7 +26,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [exchangeRates, setExchangeRates] = useState<GetLiveRatesOutput | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<LiveRates | null>(null);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, "id" | "date">) => {
      const newTransaction = await api.createTransaction(transaction);
@@ -33,9 +35,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshRates = useCallback(async () => {
     try {
+      // Fetch base rates from the live API (base is USD)
+      const response = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (!response.ok) {
+        throw new Error('Failed to fetch exchange rates');
+      }
+      const data = await response.json();
+      const baseRates = data.rates as Record<string, number>;
+
+      // Create the full matrix of currency pairs that the app expects
+      const allRates: LiveRates = {};
       const allCurrencies = currencies.map(c => c.code);
-      const rates = await getLiveRates({ currencies: allCurrencies });
-      setExchangeRates(rates);
+
+      for (const from of allCurrencies) {
+        for (const to of allCurrencies) {
+          if (from === to) continue;
+          // Example: to convert from EUR to JPY: (amount * base_usd_to_jpy) / base_usd_to_eur
+          const fromRate = baseRates[from];
+          const toRate = baseRates[to];
+          if (fromRate && toRate) {
+            allRates[`${from}-${to}`] = toRate / fromRate;
+          }
+        }
+      }
+      
+      setExchangeRates(allRates);
+      api.setLiveRates(allRates); // Pass the live rates to the mock API service
+
     } catch (error) {
       console.error("Failed to fetch live exchange rates:", error);
       // Optionally set a toast or notification for the user
@@ -45,27 +71,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const initializeAppData = async () => {
+      // Create wallets first
       const createdWallets: Wallet[] = [];
       for (const wallet of initialWallets) {
           const newWallet = await api.createWallet(wallet);
           createdWallets.push(newWallet);
-          if (newWallet.balance > 0) {
-            // Use the addTransaction function to ensure transactions are added correctly
+      }
+      setWallets(createdWallets);
+
+      // Fetch rates *before* creating initial transactions
+      await refreshRates();
+
+      // Now create initial transactions
+      for (const wallet of createdWallets) {
+          if (wallet.balance > 0) {
             await addTransaction({
-              walletId: newWallet.id,
-              amount: newWallet.balance,
+              walletId: wallet.id,
+              amount: wallet.balance,
               type: 'Deposit',
               status: 'Completed',
               description: 'Initial balance'
             });
           }
       }
-      setWallets(createdWallets);
-      await refreshRates();
     };
 
     initializeAppData();
-  }, [addTransaction, refreshRates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const addWallet = async (wallet: Omit<Wallet, "id">) => {
     const newWallet = await api.createWallet(wallet);
@@ -87,6 +120,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const swapCurrency = async (args: { fromWalletId: string; toWalletId: string; amount: number; }) => {
+    // Ensure latest rates are used for swap
+    await refreshRates();
+
     const { fromWallet, toWallet, receivedAmount } = await api.swapCurrency(args);
     setWallets(currentWallets => currentWallets.map(w => {
       if (w.id === fromWallet.id) return fromWallet;
@@ -107,8 +143,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       status: 'Completed',
       description: `Swap from ${fromWallet.currency.code}`
     });
-    // Refresh rates after a swap for the most up-to-date values
-    await refreshRates();
   };
 
   const sendFunds = async (args: { fromWalletId: string; toWalletId: string; amount: number; description: string; }) => {

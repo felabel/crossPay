@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRightLeft, Loader2, RefreshCw } from "lucide-react";
-import { GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
 
 const swapSchema = z.object({
   fromWalletId: z.string().min(1, "Please select a source wallet."),
@@ -71,7 +70,7 @@ export default function SwapPage() {
         setCurrentRate(1);
         return;
       }
-      const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}` as keyof GetLiveRatesOutput;
+      const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
       const rate = exchangeRates[rateKey];
       if (rate) {
         setToAmount(fromAmount * rate);
@@ -116,6 +115,8 @@ export default function SwapPage() {
         description: `Swapped ${values.fromAmount} ${fromWallet.currency.code} to ${toAmount.toFixed(4)} ${toWallet.currency.code}.`,
       });
       form.reset();
+      setToAmount(0);
+      setCurrentRate(null);
 
     } catch(error) {
        toast({
@@ -144,7 +145,7 @@ export default function SwapPage() {
       <CardHeader>
         <CardTitle>Swap Currency</CardTitle>
         <CardDescription>
-          Exchange funds between your wallets using simulated live rates.
+          Exchange funds between your wallets using live market rates.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -233,7 +234,7 @@ export default function SwapPage() {
                   <FormMessage />
               </FormItem>
             </div>
-             {currentRate && fromWalletId && toWalletId && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
+             {currentRate && fromWalletId && toWalletId && wallets.find(w => w.id === fromWalletId)?.currency.code !== wallets.find(w => w.id === toWalletId)?.currency.code && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
 
             <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting || !currentRate}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

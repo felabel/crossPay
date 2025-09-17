@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { ChevronsUpDown } from "lucide-react";
+import { ThemeToggle } from "./theme-toggle";
 
 export function AppHeader() {
   const { isMobile } = useSidebar();
@@ -38,6 +39,7 @@ export function AppHeader() {
           {getPageTitle(pathname)}
         </h1>
       </div>
+      <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

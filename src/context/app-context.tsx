@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import type { Wallet, Transaction, Currency } from "@/lib/types";
-import { initialWallets } from "@/lib/data";
 import * as api from "@/services/api";
 import { currencies } from "@/lib/data";
 
@@ -73,37 +72,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    const initializeAppData = async () => {
-      // Create wallets first
-      const createdWallets: Wallet[] = [];
-      if(wallets.length === 0){
-        for (const wallet of initialWallets) {
-            const newWallet = await api.createWallet(wallet);
-            createdWallets.push(newWallet);
-        }
-        setWallets(createdWallets);
-
-        // Fetch rates *before* creating initial transactions
-        await refreshRates();
-
-        // Now create initial transactions
-        for (const wallet of createdWallets) {
-            if (wallet.balance > 0) {
-              await addTransaction({
-                walletId: wallet.id,
-                amount: wallet.balance,
-                type: 'Deposit',
-                status: 'Completed',
-                description: 'Initial balance'
-              });
-            }
-        }
-      }
-    };
-
-    initializeAppData();
+    // Fetch initial rates on load
+    refreshRates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   const addWallet = async (wallet: Omit<Wallet, "id">) => {
     const newWallet = await api.createWallet(wallet);

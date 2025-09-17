@@ -22,8 +22,8 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, CircleDollarSign } from "lucide-react";
-import { exchangeRates } from "@/lib/data";
+import { TrendingUp, TrendingDown, CircleDollarSign, ArrowRightLeft, Send, Landmark, Transaction } from "lucide-react";
+import { TransactionType } from "@/lib/types";
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -34,11 +34,13 @@ const COLORS = [
 ];
 
 export default function AnalyticsPage() {
-  const { wallets, transactions } = useApp();
+  const { wallets, transactions, exchangeRates } = useApp();
 
   const convertToUSD = (amount: number, currencyCode: string) => {
+    if (!exchangeRates) return 0;
     if (currencyCode === "USD") return amount;
-    const rate = exchangeRates[`${currencyCode}-USD`];
+    const rateKey = `${currencyCode}-USD`;
+    const rate = exchangeRates[rateKey];
     return amount * (rate || 0);
   };
   
@@ -79,6 +81,25 @@ export default function AnalyticsPage() {
   const totalExpenses = transactions
     .filter((t) => t.amount < 0)
     .reduce((sum, t) => sum + convertToUSD(Math.abs(t.amount), wallets.find(w => w.id === t.walletId)?.currency.code || 'USD'), 0);
+
+  const transactionTypeData = transactions.reduce((acc, tx) => {
+      const type = tx.type;
+      const existing = acc.find(item => item.name === type);
+      if (existing) {
+        existing.value += 1;
+      } else {
+        acc.push({ name: type, value: 1 });
+      }
+      return acc;
+    }, [] as { name: TransactionType; value: number }[]);
+
+  const typeIcons: { [key in TransactionType]: React.FC<React.SVGProps<SVGSVGElement>> } = {
+      Deposit: Landmark,
+      Withdrawal: TrendingDown,
+      Swap: ArrowRightLeft,
+      Transfer: Send,
+  };
+
 
   return (
     <div className="space-y-6">
@@ -218,6 +239,32 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Transaction Types</CardTitle>
+          <CardDescription>A breakdown of your activity.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {transactionTypeData.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {transactionTypeData.map((item, index) => {
+                 const Icon = typeIcons[item.name];
+                 return(
+                  <Card key={index} className="flex flex-col items-center justify-center p-4">
+                     <Icon className="w-8 h-8 mb-2 text-primary" />
+                     <p className="text-2xl font-bold">{item.value}</p>
+                     <p className="text-sm text-muted-foreground">{item.name}{item.value > 1 ? 's' : ''}</p>
+                  </Card>
+                )})}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center text-muted-foreground py-8">
+              No transaction types to display yet.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

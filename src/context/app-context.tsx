@@ -1,52 +1,71 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import type { Wallet, Transaction, Currency } from "@/lib/types";
-import { initialWallets, initialTransactions } from "@/lib/data";
+import { initialWallets } from "@/lib/data";
 import * as api from "@/services/api";
+import { getLiveRates, GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
+import { currencies } from "@/lib/data";
 
 interface AppContextType {
   wallets: Wallet[];
   transactions: Transaction[];
+  exchangeRates: GetLiveRatesOutput | null;
   addWallet: (wallet: Omit<Wallet, "id">) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id" | "date">) => Promise<void>;
   updateWalletBalance: (walletId: string, amount: number) => Promise<void>;
   swapCurrency: (args: { fromWalletId: string; toWalletId: string; amount: number; }) => Promise<void>;
   sendFunds: (args: { fromWalletId: string; toWalletId: string; amount: number; description: string; }) => Promise<void>;
+  refreshRates: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    initialTransactions
-  );
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [exchangeRates, setExchangeRates] = useState<GetLiveRatesOutput | null>(null);
+
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, "id" | "date">) => {
+     const newTransaction = await api.createTransaction(transaction);
+     setTransactions((prev) => [newTransaction, ...prev]);
+  }, []);
+
+  const refreshRates = useCallback(async () => {
+    try {
+      const allCurrencies = currencies.map(c => c.code);
+      const rates = await getLiveRates({ currencies: allCurrencies });
+      setExchangeRates(rates);
+    } catch (error) {
+      console.error("Failed to fetch live exchange rates:", error);
+      // Optionally set a toast or notification for the user
+    }
+  }, []);
+
 
   useEffect(() => {
-    // This effect runs once on mount to populate initial wallets and create corresponding deposit transactions.
-    // This simulates starting with pre-existing wallets and having a transaction history for them.
     const initializeAppData = async () => {
-      const initialWalletPromises = initialWallets.map(async (wallet) => {
-        const newWallet = await api.createWallet(wallet);
-        if (newWallet.balance > 0) {
-          const newTransaction = await api.createTransaction({
-            walletId: newWallet.id,
-            amount: newWallet.balance,
-            type: 'Deposit',
-            status: 'Completed',
-            description: 'Initial balance'
-          });
-          setTransactions(prev => [newTransaction, ...prev]);
-        }
-        return newWallet;
-      });
-      const createdWallets = await Promise.all(initialWalletPromises);
+      const createdWallets: Wallet[] = [];
+      for (const wallet of initialWallets) {
+          const newWallet = await api.createWallet(wallet);
+          createdWallets.push(newWallet);
+          if (newWallet.balance > 0) {
+            // Use the addTransaction function to ensure transactions are added correctly
+            await addTransaction({
+              walletId: newWallet.id,
+              amount: newWallet.balance,
+              type: 'Deposit',
+              status: 'Completed',
+              description: 'Initial balance'
+            });
+          }
+      }
       setWallets(createdWallets);
+      await refreshRates();
     };
 
     initializeAppData();
-  }, []);
+  }, [addTransaction, refreshRates]);
 
   const addWallet = async (wallet: Omit<Wallet, "id">) => {
     const newWallet = await api.createWallet(wallet);
@@ -62,11 +81,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addTransaction = async (transaction: Omit<Transaction, "id" | "date">) => {
-     const newTransaction = await api.createTransaction(transaction);
-     setTransactions((prev) => [newTransaction, ...prev]);
-  };
-
   const updateWalletBalance = async (walletId: string, amount: number) => {
     await api.depositFunds({ walletId, amount });
     setWallets(wallets.map(w => w.id === walletId ? {...w, balance: w.balance + amount} : w));
@@ -79,7 +93,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (w.id === toWallet.id) return toWallet;
       return w;
     }));
-    // Add transactions for the swap
     await addTransaction({
       walletId: fromWallet.id,
       amount: -args.amount,
@@ -94,6 +107,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       status: 'Completed',
       description: `Swap from ${fromWallet.currency.code}`
     });
+    // Refresh rates after a swap for the most up-to-date values
+    await refreshRates();
   };
 
   const sendFunds = async (args: { fromWalletId: string; toWalletId: string; amount: number; description: string; }) => {
@@ -113,7 +128,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AppContext.Provider value={{ wallets, transactions, addWallet, addTransaction, updateWalletBalance, swapCurrency, sendFunds }}>
+    <AppContext.Provider value={{ wallets, transactions, exchangeRates, addWallet, addTransaction, updateWalletBalance, swapCurrency, sendFunds, refreshRates }}>
       {children}
     </AppContext.Provider>
   );

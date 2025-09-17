@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -30,8 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRightLeft, Loader2 } from "lucide-react";
-import { exchangeRates } from "@/lib/data";
+import { ArrowRightLeft, Loader2, RefreshCw } from "lucide-react";
+import { GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
 
 const swapSchema = z.object({
   fromWalletId: z.string().min(1, "Please select a source wallet."),
@@ -40,10 +40,11 @@ const swapSchema = z.object({
 });
 
 export default function SwapPage() {
-  const { wallets, swapCurrency } = useApp();
+  const { wallets, swapCurrency, exchangeRates, refreshRates } = useApp();
   const { toast } = useToast();
   const [toAmount, setToAmount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentRate, setCurrentRate] = useState<number | null>(null);
 
   const form = useForm<z.infer<typeof swapSchema>>({
@@ -55,22 +56,22 @@ export default function SwapPage() {
     },
   });
 
-  const { watch } = form;
+  const { watch, setValue } = form;
   const fromWalletId = watch("fromWalletId");
   const toWalletId = watch("toWalletId");
   const fromAmount = watch("fromAmount");
 
-  useEffect(() => {
+  const calculateRate = useCallback(() => {
     const fromWallet = wallets.find(w => w.id === fromWalletId);
     const toWallet = wallets.find(w => w.id === toWalletId);
 
-    if (fromWallet && toWallet && fromAmount > 0) {
+    if (fromWallet && toWallet && fromAmount > 0 && exchangeRates) {
       if (fromWallet.currency.code === toWallet.currency.code) {
         setToAmount(fromAmount);
         setCurrentRate(1);
         return;
       }
-      const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
+      const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}` as keyof GetLiveRatesOutput;
       const rate = exchangeRates[rateKey];
       if (rate) {
         setToAmount(fromAmount * rate);
@@ -83,7 +84,11 @@ export default function SwapPage() {
       setToAmount(0);
       setCurrentRate(null);
     }
-  }, [fromWalletId, toWalletId, fromAmount, wallets]);
+  }, [fromWalletId, toWalletId, fromAmount, wallets, exchangeRates]);
+
+  useEffect(() => {
+    calculateRate();
+  }, [calculateRate]);
 
   async function onSubmit(values: z.infer<typeof swapSchema>) {
     const fromWallet = wallets.find((w) => w.id === values.fromWalletId);
@@ -123,12 +128,23 @@ export default function SwapPage() {
     }
   }
 
+  const handleRefreshRates = async () => {
+    setIsRefreshing(true);
+    await refreshRates();
+    calculateRate(); // Recalculate with new rates
+    setIsRefreshing(false);
+    toast({
+      title: "Rates Updated",
+      description: "The latest exchange rates have been fetched.",
+    });
+  }
+
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Swap Currency</CardTitle>
         <CardDescription>
-          Exchange funds between your wallets.
+          Exchange funds between your wallets using simulated live rates.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -174,9 +190,16 @@ export default function SwapPage() {
             
             <div className="flex items-center justify-center relative">
                  <div className="absolute w-full h-[1px] bg-border"></div>
-                <div className="z-10 h-10 w-10 bg-background border rounded-full flex items-center justify-center">
-                    <ArrowRightLeft className="w-5 h-5 text-muted-foreground" />
-                </div>
+                <Button 
+                    type="button" 
+                    variant="outline"
+                    size="icon"
+                    onClick={handleRefreshRates}
+                    disabled={isRefreshing || isSubmitting}
+                    className="z-10 h-10 w-10 bg-background border rounded-full flex items-center justify-center"
+                >
+                    <RefreshCw className={`w-5 h-5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 items-start md:grid-cols-2 md:gap-8">
@@ -203,14 +226,14 @@ export default function SwapPage() {
                 )}
               />
               <FormItem>
-                  <FormLabel>You receive</FormLabel>
+                  <FormLabel>You receive (approx.)</FormLabel>
                   <FormControl>
                     <Input type="number" readOnly value={toAmount > 0 ? toAmount.toFixed(4) : "0.00"} className="bg-muted" />
                   </FormControl>
                   <FormMessage />
               </FormItem>
             </div>
-             {currentRate && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
+             {currentRate && fromWalletId && toWalletId && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
 
             <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting || !currentRate}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

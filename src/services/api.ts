@@ -1,6 +1,7 @@
 // This file mocks a remote API.
-import { initialWallets, exchangeRates } from "@/lib/data";
+import { currencies } from "@/lib/data";
 import type { Wallet, Transaction } from "@/lib/types";
+import { getLiveRates, GetLiveRatesOutput } from "@/ai/flows/live-exchange-rate-flow";
 
 // In-memory "database"
 let wallets: Wallet[] = [];
@@ -51,7 +52,10 @@ export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromW
         throw new Error("Insufficient funds for the swap.");
     }
 
-    const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
+    const allCurrencies = currencies.map(c => c.code);
+    const exchangeRates = await getLiveRates({ currencies: allCurrencies });
+
+    const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}` as keyof GetLiveRatesOutput;
     const rate = exchangeRates[rateKey];
 
     if (!rate) {

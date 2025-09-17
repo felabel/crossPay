@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 export const metadata: Metadata = {
   title: "CrossPay Dashboard",
   description: "A modern dashboard for managing your cross-border payments.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

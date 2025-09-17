@@ -35,7 +35,7 @@ import { Loader2 } from "lucide-react";
 const sendSchema = z.object({
   fromWalletId: z.string().min(1, "Please select a wallet."),
   amount: z.coerce.number().positive("Amount must be positive."),
-  recipient: z.string().min(3, "Recipient name is required."),
+  recipient: z.string().min(26, "Please enter a valid wallet address.").max(42, "Please enter a valid wallet address."),
   description: z.string().optional(),
 });
 
@@ -63,14 +63,14 @@ export default function SendPage() {
     try {
       await sendFunds({
         fromWalletId: values.fromWalletId,
-        toWalletId: "recipient", // Mock recipient
+        toWalletId: values.recipient, // Using wallet address as recipient ID
         amount: values.amount,
-        description: values.description || `Sent to ${values.recipient}`,
+        description: values.description || `Sent to ${values.recipient.substring(0,10)}...`,
       });
       
       toast({
         title: "Funds Sent",
-        description: `${values.amount} ${fromWallet.currency.code} sent to ${values.recipient}.`,
+        description: `${values.amount} ${fromWallet.currency.code} sent to wallet ${values.recipient.substring(0,10)}...`,
       });
       form.reset();
     } catch (error) {
@@ -89,7 +89,7 @@ export default function SendPage() {
       <CardHeader>
         <CardTitle>Send Funds</CardTitle>
         <CardDescription>
-          Transfer funds from your wallet to a recipient.
+          Transfer funds from your wallet to another wallet address.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -124,9 +124,9 @@ export default function SendPage() {
               name="recipient"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Recipient</FormLabel>
+                  <FormLabel>Recipient Wallet Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., John Doe or john@example.com" {...field} disabled={isSubmitting}/>
+                    <Input placeholder="e.g., 0x..." {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

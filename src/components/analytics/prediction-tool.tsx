@@ -1,16 +1,10 @@
 "use client";
 
 import React from "react";
+import { useForm, FormProvider } from "react-hook-form";
 import { useFormState, useFormStatus } from "react-dom";
 import { getExchangeRatePrediction } from "@/app/actions";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -47,37 +41,41 @@ export function PredictionTool() {
     getExchangeRatePrediction,
     initialState
   );
+  
+  const form = useForm();
 
   return (
     <div className="space-y-6">
-      <form action={formAction} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-                <FormLabel>Base Currency</FormLabel>
-                <Select name="baseCurrency">
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                    {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-             <div className="space-y-2">
-                <FormLabel>Quote Currency</FormLabel>
-                <Select name="quoteCurrency">
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                    {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="space-y-2">
-                <FormLabel>Current Rate</FormLabel>
-                <Input name="currentRate" type="number" step="any" placeholder="e.g., 1.08" />
-            </div>
-        </div>
+      <FormProvider {...form}>
+        <form action={formAction} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                  <FormLabel>Base Currency</FormLabel>
+                  <Select name="baseCurrency">
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                      {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div className="space-y-2">
+                  <FormLabel>Quote Currency</FormLabel>
+                  <Select name="quoteCurrency">
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                      {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div className="space-y-2">
+                  <FormLabel>Current Rate</FormLabel>
+                  <Input name="currentRate" type="number" step="any" placeholder="e.g., 1.08" />
+              </div>
+          </div>
 
-        <SubmitButton />
-      </form>
+          <SubmitButton />
+        </form>
+      </FormProvider>
 
       {state.error && (
         <Alert variant="destructive">

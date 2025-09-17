@@ -23,14 +23,15 @@ import Link from "next/link";
 import { useApp } from "@/context/app-context";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { exchangeRates } from "@/lib/data";
 
 export default function DashboardPage() {
-  const { wallets, transactions } = useApp();
+  const { wallets, transactions, exchangeRates } = useApp();
 
   const convertToUSD = (amount: number, currencyCode: string) => {
+    if (!exchangeRates) return 0;
     if (currencyCode === "USD") return amount;
-    const rate = exchangeRates[`${currencyCode}-USD`];
+    const rateKey = `${currencyCode}-USD`;
+    const rate = exchangeRates[rateKey];
     return amount * (rate || 0);
   };
 

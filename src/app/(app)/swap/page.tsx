@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Loader2 } from "lucide-react";
+import { exchangeRates } from "@/lib/data";
 
 const swapSchema = z.object({
   fromWalletId: z.string().min(1, "Please select a source wallet."),
@@ -38,24 +39,12 @@ const swapSchema = z.object({
   fromAmount: z.coerce.number().positive("Amount must be positive."),
 });
 
-// Dummy exchange rates for simulation
-const exchangeRates: { [key: string]: number } = {
-  "USD-EUR": 0.93, "EUR-USD": 1.08,
-  "USD-GBP": 0.79, "GBP-USD": 1.27,
-  "USD-JPY": 157.0, "JPY-USD": 0.0064,
-  "USD-BTC": 0.000015, "BTC-USD": 66000,
-  "EUR-GBP": 0.85, "GBP-EUR": 1.18,
-  "EUR-JPY": 169.0, "JPY-EUR": 0.0059,
-  "EUR-BTC": 0.000016, "BTC-EUR": 62000,
-  "GBP-JPY": 199.0, "JPY-GBP": 0.005,
-  "GBP-BTC": 0.000019, "BTC-GBP": 52000,
-  "JPY-BTC": 0.00000023, "BTC-JPY": 4300000,
-};
-
 export default function SwapPage() {
-  const { wallets, addTransaction, updateWalletBalance } = useApp();
+  const { wallets, swapCurrency } = useApp();
   const { toast } = useToast();
   const [toAmount, setToAmount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentRate, setCurrentRate] = useState<number | null>(null);
 
   const form = useForm<z.infer<typeof swapSchema>>({
     resolver: zodResolver(swapSchema),
@@ -66,7 +55,7 @@ export default function SwapPage() {
     },
   });
 
-  const { watch, setValue } = form;
+  const { watch } = form;
   const fromWalletId = watch("fromWalletId");
   const toWalletId = watch("toWalletId");
   const fromAmount = watch("fromAmount");
@@ -78,56 +67,60 @@ export default function SwapPage() {
     if (fromWallet && toWallet && fromAmount > 0) {
       if (fromWallet.currency.code === toWallet.currency.code) {
         setToAmount(fromAmount);
+        setCurrentRate(1);
         return;
       }
       const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
       const rate = exchangeRates[rateKey];
       if (rate) {
         setToAmount(fromAmount * rate);
+        setCurrentRate(rate);
       } else {
-        setToAmount(0); // No direct rate, could implement triangulation
+        setToAmount(0);
+        setCurrentRate(null);
       }
     } else {
       setToAmount(0);
+      setCurrentRate(null);
     }
   }, [fromWalletId, toWalletId, fromAmount, wallets]);
 
-  function onSubmit(values: z.infer<typeof swapSchema>) {
+  async function onSubmit(values: z.infer<typeof swapSchema>) {
     const fromWallet = wallets.find((w) => w.id === values.fromWalletId);
     const toWallet = wallets.find((w) => w.id === values.toWalletId);
     
-    if (!fromWallet || !toWallet || fromWallet.balance < values.fromAmount) {
+    if (!fromWallet || !toWallet || !currentRate) {
       toast({
         variant: "destructive",
         title: "Swap Failed",
-        description: "Insufficient funds or invalid wallets selected.",
+        description: "Invalid wallet selection or rate unavailable.",
       });
       return;
     }
+    
+    setIsSubmitting(true);
+    try {
+      await swapCurrency({
+        fromWalletId: values.fromWalletId,
+        toWalletId: values.toWalletId,
+        amount: values.fromAmount,
+      });
 
-    updateWalletBalance(fromWallet.id, -values.fromAmount);
-    updateWalletBalance(toWallet.id, toAmount);
+      toast({
+        title: "Swap Successful",
+        description: `Swapped ${values.fromAmount} ${fromWallet.currency.code} to ${toAmount.toFixed(4)} ${toWallet.currency.code}.`,
+      });
+      form.reset();
 
-    addTransaction({
-      walletId: fromWallet.id,
-      amount: -values.fromAmount,
-      type: "Swap",
-      status: "Completed",
-      description: `Swap to ${toWallet.currency.code}`,
-    });
-    addTransaction({
-      walletId: toWallet.id,
-      amount: toAmount,
-      type: "Swap",
-      status: "Completed",
-      description: `Swap from ${fromWallet.currency.code}`,
-    });
-
-    toast({
-      title: "Swap Successful",
-      description: `Swapped ${values.fromAmount} ${fromWallet.currency.code} to ${toAmount.toFixed(4)} ${toWallet.currency.code}.`,
-    });
-    form.reset();
+    } catch(error) {
+       toast({
+        variant: "destructive",
+        title: "Swap Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -148,7 +141,7 @@ export default function SwapPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>From</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Source Wallet" /></SelectTrigger>
                       </FormControl>
@@ -171,7 +164,7 @@ export default function SwapPage() {
                   <FormItem>
                     <FormLabel>You send</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0.00" {...field} />
+                      <Input type="number" placeholder="0.00" {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -179,8 +172,9 @@ export default function SwapPage() {
               />
             </div>
             
-            <div className="flex items-center justify-center">
-                <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center">
+            <div className="flex items-center justify-center relative">
+                 <div className="absolute w-full h-[1px] bg-border"></div>
+                <div className="z-10 h-10 w-10 bg-background border rounded-full flex items-center justify-center">
                     <ArrowRightLeft className="w-5 h-5 text-muted-foreground" />
                 </div>
             </div>
@@ -192,7 +186,7 @@ export default function SwapPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>To</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Destination Wallet" /></SelectTrigger>
                       </FormControl>
@@ -211,13 +205,17 @@ export default function SwapPage() {
               <FormItem>
                   <FormLabel>You receive</FormLabel>
                   <FormControl>
-                    <Input type="number" readOnly value={toAmount.toFixed(4)} className="bg-muted" />
+                    <Input type="number" readOnly value={toAmount > 0 ? toAmount.toFixed(4) : "0.00"} className="bg-muted" />
                   </FormControl>
                   <FormMessage />
               </FormItem>
             </div>
+             {currentRate && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
 
-            <Button type="submit" className="w-full" variant="accent">Swap</Button>
+            <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting || !currentRate}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Swapping..." : "Swap"}
+            </Button>
           </form>
         </Form>
       </CardContent>

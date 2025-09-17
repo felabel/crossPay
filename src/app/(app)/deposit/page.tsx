@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const depositSchema = z.object({
   walletId: z.string().min(1, "Please select a wallet."),
@@ -41,6 +42,7 @@ const depositSchema = z.object({
 export default function DepositPage() {
   const { wallets, addTransaction, updateWalletBalance } = useApp();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof depositSchema>>({
     resolver: zodResolver(depositSchema),
@@ -51,27 +53,38 @@ export default function DepositPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof depositSchema>) {
+  async function onSubmit(values: z.infer<typeof depositSchema>) {
     const wallet = wallets.find((w) => w.id === values.walletId);
     if (!wallet) return;
 
-    addTransaction({
-      walletId: values.walletId,
-      amount: values.amount,
-      type: "Deposit",
-      status: "Completed",
-      description: values.description || `Deposit to ${wallet.name}`,
-    });
-    
-    updateWalletBalance(values.walletId, values.amount);
+    setIsSubmitting(true);
 
-    toast({
-      title: "Deposit Successful",
-      description: `${new Intl.NumberFormat().format(values.amount)} ${
-        wallet.currency.code
-      } deposited to ${wallet.name}.`,
-    });
-    form.reset();
+    try {
+      await updateWalletBalance(values.walletId, values.amount);
+      await addTransaction({
+        walletId: values.walletId,
+        amount: values.amount,
+        type: "Deposit",
+        status: "Completed",
+        description: values.description || `Deposit to ${wallet.name}`,
+      });
+
+      toast({
+        title: "Deposit Successful",
+        description: `${new Intl.NumberFormat().format(values.amount)} ${
+          wallet.currency.code
+        } deposited to ${wallet.name}.`,
+      });
+      form.reset();
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Deposit Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -94,6 +107,7 @@ export default function DepositPage() {
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
+                    disabled={isSubmitting}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -119,7 +133,7 @@ export default function DepositPage() {
                 <FormItem>
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0.00" {...field} />
+                    <Input type="number" placeholder="0.00" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -132,7 +146,7 @@ export default function DepositPage() {
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Paycheck" {...field} />
+                    <Input placeholder="e.g., Paycheck" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormDescription>
                     A brief note about this deposit.
@@ -141,8 +155,9 @@ export default function DepositPage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" variant="accent">
-              Deposit Funds
+            <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Depositing..." : "Deposit Funds"}
             </Button>
           </form>
         </Form>

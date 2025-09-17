@@ -1,0 +1,100 @@
+// This file mocks a remote API.
+import { initialWallets, exchangeRates } from "@/lib/data";
+import type { Wallet, Transaction } from "@/lib/types";
+
+// In-memory "database"
+let wallets: Wallet[] = [...initialWallets];
+let transactionIdCounter = initialWallets.length + 1;
+let walletIdCounter = initialWallets.length + 1;
+
+const randomDelay = () => new Promise(res => setTimeout(res, Math.random() * 1000 + 500));
+const shouldFail = () => Math.random() < 0.1; // 10% chance of failure
+
+export async function createWallet(walletData: Omit<Wallet, 'id'>): Promise<Wallet> {
+  await randomDelay();
+  if (shouldFail()) {
+    throw new Error("Failed to create wallet on the server.");
+  }
+  const newWallet: Wallet = {
+    ...walletData,
+    id: `w${walletIdCounter++}`,
+  };
+  wallets.push(newWallet);
+  return newWallet;
+}
+
+export async function depositFunds({ walletId, amount }: { walletId: string; amount: number }): Promise<Wallet> {
+  await randomDelay();
+  // Deposits always succeed
+  const wallet = wallets.find(w => w.id === walletId);
+  if (!wallet) {
+    throw new Error("Wallet not found.");
+  }
+  wallet.balance += amount;
+  return { ...wallet };
+}
+
+export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet, toWallet: Wallet }> {
+    await randomDelay();
+    if (shouldFail()) {
+        throw new Error("Currency swap failed due to a network error.");
+    }
+    
+    const fromWallet = wallets.find(w => w.id === fromWalletId);
+    const toWallet = wallets.find(w => w.id === toWalletId);
+
+    if (!fromWallet || !toWallet) {
+        throw new Error("One or both wallets not found.");
+    }
+
+    if (fromWallet.balance < amount) {
+        throw new Error("Insufficient funds for the swap.");
+    }
+
+    const rateKey = `${fromWallet.currency.code}-${toWallet.currency.code}`;
+    const rate = exchangeRates[rateKey];
+
+    if (!rate) {
+        throw new Error(`Exchange rate not available for ${fromWallet.currency.code} to ${toWallet.currency.code}.`);
+    }
+
+    const receivedAmount = amount * rate;
+    fromWallet.balance -= amount;
+    toWallet.balance += receivedAmount;
+
+    return { fromWallet: { ...fromWallet }, toWallet: { ...toWallet } };
+}
+
+export async function sendFunds({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet }> {
+    await randomDelay();
+
+    const fromWallet = wallets.find(w => w.id === fromWalletId);
+
+    if (!fromWallet) {
+        throw new Error("Source wallet not found.");
+    }
+     if (fromWallet.balance < amount) {
+        throw new Error("Insufficient funds to send.");
+    }
+    
+    if (shouldFail()) {
+        throw new Error("Transfer failed due to a server issue.");
+    }
+    
+    fromWallet.balance -= amount;
+    
+    // In a real app, the recipient's wallet would be updated.
+    // For this mock, we only care about the sender's balance changing.
+
+    return { fromWallet: { ...fromWallet } };
+}
+
+export async function createTransaction(txData: Omit<Transaction, 'id' | 'date'>): Promise<Transaction> {
+    await randomDelay();
+    const newTransaction: Transaction = {
+        ...txData,
+        id: `t${transactionIdCounter++}`,
+        date: new Date(),
+    };
+    return newTransaction;
+}

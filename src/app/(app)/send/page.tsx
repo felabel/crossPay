@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const sendSchema = z.object({
   fromWalletId: z.string().min(1, "Please select a wallet."),
@@ -39,8 +40,9 @@ const sendSchema = z.object({
 });
 
 export default function SendPage() {
-  const { wallets, addTransaction, updateWalletBalance } = useApp();
+  const { wallets, sendFunds } = useApp();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof sendSchema>>({
     resolver: zodResolver(sendSchema),
@@ -52,33 +54,34 @@ export default function SendPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof sendSchema>) {
+  async function onSubmit(values: z.infer<typeof sendSchema>) {
     const fromWallet = wallets.find((w) => w.id === values.fromWalletId);
+    if (!fromWallet) return;
+
+    setIsSubmitting(true);
     
-    if (!fromWallet || fromWallet.balance < values.amount) {
+    try {
+      await sendFunds({
+        fromWalletId: values.fromWalletId,
+        toWalletId: "recipient", // Mock recipient
+        amount: values.amount,
+        description: values.description || `Sent to ${values.recipient}`,
+      });
+      
       toast({
+        title: "Funds Sent",
+        description: `${values.amount} ${fromWallet.currency.code} sent to ${values.recipient}.`,
+      });
+      form.reset();
+    } catch (error) {
+       toast({
         variant: "destructive",
         title: "Send Failed",
-        description: "Insufficient funds or invalid wallet.",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    updateWalletBalance(fromWallet.id, -values.amount);
-
-    addTransaction({
-      walletId: fromWallet.id,
-      amount: -values.amount,
-      type: "Transfer",
-      status: "Completed",
-      description: values.description || `Sent to ${values.recipient}`,
-    });
-
-    toast({
-      title: "Funds Sent",
-      description: `${values.amount} ${fromWallet.currency.code} sent to ${values.recipient}.`,
-    });
-    form.reset();
   }
 
   return (
@@ -98,7 +101,7 @@ export default function SendPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>From Wallet</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a wallet" />
@@ -123,7 +126,7 @@ export default function SendPage() {
                 <FormItem>
                   <FormLabel>Recipient</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., John Doe or john@example.com" {...field} />
+                    <Input placeholder="e.g., John Doe or john@example.com" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -136,7 +139,7 @@ export default function SendPage() {
                 <FormItem>
                   <FormLabel>Amount to Send</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0.00" {...field} />
+                    <Input type="number" placeholder="0.00" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -149,14 +152,15 @@ export default function SendPage() {
                 <FormItem>
                   <FormLabel>Note (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., For dinner" {...field} />
+                    <Input placeholder="e.g., For dinner" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" variant="accent">
-              Send Funds
+            <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting}>
+               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Sending..." : "Send Funds"}
             </Button>
           </form>
         </Form>

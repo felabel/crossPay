@@ -14,7 +14,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -50,6 +51,7 @@ const walletSchema = z.object({
 export default function WalletsPage() {
   const { wallets, addWallet } = useApp();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof walletSchema>>({
@@ -61,10 +63,13 @@ export default function WalletsPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof walletSchema>) {
+  async function onSubmit(values: z.infer<typeof walletSchema>) {
     const currency = currencies.find((c) => c.code === values.currencyCode);
-    if (currency) {
-      addWallet({
+    if (!currency) return;
+
+    setIsSubmitting(true);
+    try {
+       await addWallet({
         name: values.name,
         currency,
         balance: values.balance,
@@ -75,6 +80,14 @@ export default function WalletsPage() {
       });
       setIsDialogOpen(false);
       form.reset();
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Failed to Create Wallet",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -131,7 +144,7 @@ export default function WalletsPage() {
                   <FormItem>
                     <FormLabel>Wallet Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Savings" {...field} />
+                      <Input placeholder="e.g., Savings" {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -143,7 +156,7 @@ export default function WalletsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a currency" />
@@ -168,14 +181,20 @@ export default function WalletsPage() {
                   <FormItem>
                     <FormLabel>Initial Balance</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0.00" {...field} />
+                      <Input type="number" placeholder="0.00" {...field} disabled={isSubmitting}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <DialogFooter>
-                <Button type="submit" className="w-full">Create Wallet</Button>
+                 <DialogClose asChild>
+                    <Button type="button" variant="ghost" disabled={isSubmitting}>Cancel</Button>
+                 </DialogClose>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                   {isSubmitting ? "Creating..." : "Create Wallet"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

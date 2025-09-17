@@ -35,7 +35,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       const allCurrencies = currencies.map(c => c.code);
       const cryptoCurrencies = currencies.filter(c => c.isCrypto).map(c => c.id);
-      const fiatCurrencies = currencies.filter(c => !c.isCrypto).map(c => c.code);
 
       // 1. Fetch base rates for FIAT currencies from ER-API (base is USD)
       const fiatResponse = await fetch('https://open.er-api.com/v6/latest/USD');

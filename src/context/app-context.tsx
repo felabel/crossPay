@@ -21,10 +21,50 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Helper functions for localStorage
+const loadFromStorage = <T>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = window.localStorage.getItem(key);
+    if (item) {
+      // For transactions, we need to convert date strings back to Date objects
+      if (key === 'transactions') {
+        return JSON.parse(item, (k, v) => {
+          if (k === 'date') return new Date(v);
+          return v;
+        });
+      }
+      return JSON.parse(item);
+    }
+  } catch (error) {
+    console.error(`Error reading from localStorage for key "${key}":`, error);
+  }
+  return defaultValue;
+};
+
+const saveToStorage = <T>(key: string, value: T) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error writing to localStorage for key "${key}":`, error);
+  }
+};
+
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [wallets, setWallets] = useState<Wallet[]>(() => loadFromStorage('wallets', []));
+  const [transactions, setTransactions] = useState<Transaction[]>(() => loadFromStorage('transactions', []));
   const [exchangeRates, setExchangeRates] = useState<LiveRates | null>(null);
+
+  useEffect(() => {
+    saveToStorage('wallets', wallets);
+  }, [wallets]);
+  
+  useEffect(() => {
+    saveToStorage('transactions', transactions);
+  }, [transactions]);
+
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, "id" | "date">) => {
      const newTransaction = await api.createTransaction(transaction);
@@ -33,7 +73,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshRates = useCallback(async () => {
     try {
-      const allCurrencies = currencies.map(c => c.code);
+      const allCurrencyCodes = currencies.map(c => c.code);
       const cryptoCurrencies = currencies.filter(c => c.isCrypto).map(c => c.id);
 
       // 1. Fetch base rates for FIAT currencies from ER-API (base is USD)
@@ -41,7 +81,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (!fiatResponse.ok) throw new Error('Failed to fetch fiat exchange rates');
       const fiatData = await fiatResponse.json();
       const baseFiatRates = fiatData.rates as Record<string, number>;
-      baseFiatRates['USD'] = 1; // Add USD to itself
+      baseFiatRates['USD'] = 1;
 
       // 2. Fetch rates for CRYPTO currencies from CoinGecko (base is USD)
       let cryptoRatesInUSD: Record<string, number> = {};
@@ -63,17 +103,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       // 4. Create the full matrix of all currency pairs
       const allRates: LiveRates = {};
-      for (const from of allCurrencies) {
-        for (const to of allCurrencies) {
-          if (from === to) {
-            allRates[`${from}-${to}`] = 1;
-            continue;
-          };
-          const fromRate = allRatesInUSD[from];
-          const toRate = allRatesInUSD[to];
+      for (const from of allCurrencyCodes) {
+        for (const to of allCurrencyCodes) {
+          const fromRateUSD = allRatesInUSD[from];
+          const toRateUSD = allRatesInUSD[to];
           
-          if (fromRate && toRate) {
-             allRates[`${from}-${to}`] = toRate / fromRate;
+          if (fromRateUSD && toRateUSD) {
+             allRates[`${from}-${to}`] = toRateUSD / fromRateUSD;
           }
         }
       }
@@ -89,6 +125,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     refreshRates();
+    const intervalId = setInterval(refreshRates, 300000); // Refresh every 5 minutes
+    return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -166,3 +204,5 @@ export const useApp = () => {
   }
   return context;
 };
+
+    

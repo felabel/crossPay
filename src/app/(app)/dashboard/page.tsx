@@ -23,19 +23,28 @@ import Link from "next/link";
 import { useApp } from "@/context/app-context";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { exchangeRates } from "@/lib/data";
 
 export default function DashboardPage() {
   const { wallets, transactions } = useApp();
 
-  const totalBalance = wallets.reduce((acc, wallet) => {
-    // A simple conversion for demo purposes. NOT FOR PRODUCTION.
-    let rate = 1;
-    if (wallet.currency.code === "EUR") rate = 1.08;
-    if (wallet.currency.code === "GBP") rate = 1.26;
-    if (wallet.currency.code === "JPY") rate = 0.0064;
-    if (wallet.currency.code === "BTC") rate = 65000;
-    return acc + wallet.balance * rate;
+  const convertToUSD = (amount: number, currencyCode: string) => {
+    if (currencyCode === "USD") return amount;
+    const rate = exchangeRates[`${currencyCode}-USD`];
+    return amount * (rate || 0);
+  };
+
+  const totalBalanceUSD = wallets.reduce((sum, wallet) => {
+    return sum + convertToUSD(wallet.balance, wallet.currency.code);
   }, 0);
+  
+  const totalIncome = transactions
+    .filter((t) => t.amount > 0)
+    .reduce((sum, t) => sum + convertToUSD(t.amount, wallets.find(w => w.id === t.walletId)?.currency.code || 'USD'), 0);
+
+  const totalExpenses = transactions
+    .filter((t) => t.amount < 0)
+    .reduce((sum, t) => sum + convertToUSD(Math.abs(t.amount), wallets.find(w => w.id === t.walletId)?.currency.code || 'USD'), 0);
 
   const recentTransactions = transactions.slice(0, 5);
 
@@ -48,12 +57,12 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Balance (USD)</CardTitle>
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div>
-            <p className="text-xs text-muted-foreground">Across all wallets (in USD)</p>
+            <div className="text-2xl font-bold">{formatCurrency(totalBalanceUSD)}</div>
+            <p className="text-xs text-muted-foreground">Across all wallets</p>
           </CardContent>
         </Card>
         <Card>
@@ -68,22 +77,22 @@ export default function DashboardPage() {
         </Card>
          <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Income</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Income (USD)</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(3500)}</div>
-            <p className="text-xs text-muted-foreground">+18% from last month</p>
+            <div className="text-2xl font-bold">{formatCurrency(totalIncome)}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
          <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Expenses (USD)</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(850)}</div>
-            <p className="text-xs text-muted-foreground">-5% from last month</p>
+            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
       </div>

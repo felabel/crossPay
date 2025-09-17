@@ -6,7 +6,6 @@ import { initialWallets } from "@/lib/data";
 import * as api from "@/services/api";
 import { currencies } from "@/lib/data";
 
-// This type is now defined here since we removed the Genkit flow
 export type LiveRates = Record<string, number>;
 
 interface AppContextType {
@@ -51,10 +50,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         for (const to of allCurrencies) {
           if (from === to) continue;
           // Example: to convert from EUR to JPY: (amount * base_usd_to_jpy) / base_usd_to_eur
-          const fromRate = baseRates[from];
-          const toRate = baseRates[to];
+          const fromRate = baseRates[from] || 1; // Default to 1 if currency is USD itself
+          const toRate = baseRates[to] || 1;
           if (fromRate && toRate) {
-            allRates[`${from}-${to}`] = toRate / fromRate;
+             if (from === 'USD') {
+                allRates[`${from}-${to}`] = toRate;
+             } else {
+                allRates[`${from}-${to}`] = toRate / fromRate;
+             }
           }
         }
       }
@@ -73,26 +76,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const initializeAppData = async () => {
       // Create wallets first
       const createdWallets: Wallet[] = [];
-      for (const wallet of initialWallets) {
-          const newWallet = await api.createWallet(wallet);
-          createdWallets.push(newWallet);
-      }
-      setWallets(createdWallets);
+      if(wallets.length === 0){
+        for (const wallet of initialWallets) {
+            const newWallet = await api.createWallet(wallet);
+            createdWallets.push(newWallet);
+        }
+        setWallets(createdWallets);
 
-      // Fetch rates *before* creating initial transactions
-      await refreshRates();
+        // Fetch rates *before* creating initial transactions
+        await refreshRates();
 
-      // Now create initial transactions
-      for (const wallet of createdWallets) {
-          if (wallet.balance > 0) {
-            await addTransaction({
-              walletId: wallet.id,
-              amount: wallet.balance,
-              type: 'Deposit',
-              status: 'Completed',
-              description: 'Initial balance'
-            });
-          }
+        // Now create initial transactions
+        for (const wallet of createdWallets) {
+            if (wallet.balance > 0) {
+              await addTransaction({
+                walletId: wallet.id,
+                amount: wallet.balance,
+                type: 'Deposit',
+                status: 'Completed',
+                description: 'Initial balance'
+              });
+            }
+        }
       }
     };
 

@@ -1,9 +1,22 @@
 // This file mocks a remote API.
 import type { Wallet, Transaction } from "@/lib/types";
 // In-memory "database"
-let wallets: Wallet[] = [];
+let wallets: Wallet[] =  loadWalletsFromStorage();
 let transactionIdCounter = 1;
 let walletIdCounter = 1;
+
+function saveWalletsToStorage() {
+  localStorage.setItem("wallets", JSON.stringify(wallets));
+}
+
+function loadWalletsFromStorage(): Wallet[] {
+  try {
+    const stored = localStorage.getItem("wallets");
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function getWallets(): Wallet[] {
   return wallets;
@@ -29,6 +42,7 @@ export async function createWallet(walletData: Omit<Wallet, 'id'>): Promise<Wall
     id: `w${walletIdCounter++}`,
   };
   wallets.push(newWallet);
+    saveWalletsToStorage();
   return newWallet;
 }
 
@@ -40,6 +54,7 @@ export async function depositFunds({ walletId, amount }: { walletId: string; amo
     throw new Error("Wallet not found.");
   }
   wallet.balance += amount;
+    saveWalletsToStorage();
   return { ...wallet };
 }
 

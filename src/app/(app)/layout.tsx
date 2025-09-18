@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   SidebarProvider,
   Sidebar,
@@ -43,7 +44,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
-            <CreditCard className="w-8 h-8 text-primary" />
+            {/* <CreditCard className="w-8 h-8 text-primary" /> */}
+            <Image src="/favicon.ico" alt="CrossPay Logo" width={32} height={32} />
             <h1 className="text-xl font-bold">CrossPay</h1>
           </div>
         </SidebarHeader>

@@ -100,14 +100,14 @@ export default function WalletsPage() {
             View and manage your currency wallets.
           </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => setIsDialogOpen(true)} className="card-wavy">
           <PlusCircle className="mr-2 h-4 w-4" /> Create Wallet
         </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {wallets.map((wallet) => (
-          <Card key={wallet.id}>
+          <Card key={wallet.id} className="card-wavy hover:scale-[1.02] transition-all">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{wallet.name}</span>

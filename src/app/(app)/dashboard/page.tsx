@@ -56,7 +56,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        {/* <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -skew-x-12" style={{ transform: "translateX(-100%)" }}></div> */}
+        <Card className="card-wavy bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-xl transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Balance (USD)</CardTitle>
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
@@ -66,7 +67,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Across all wallets</p>
           </CardContent>
         </Card>
-        <Card>
+      <Card className="card-wavy bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Wallets</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -76,7 +77,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Active wallets</p>
           </CardContent>
         </Card>
-         <Card>
+        <Card className="card-wavy bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income (USD)</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -86,7 +87,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
-         <Card>
+        <Card className="card-wavy bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses (USD)</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
@@ -98,34 +99,34 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card >
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
           <CardDescription>
             Perform common actions with a single click.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <CardContent className=" grid grid-cols-2 gap-4 md:grid-cols-4">
           <Link href="/send" passHref>
-            <Button variant="outline" className="w-full h-24 flex-col gap-2">
+            <Button variant="outline" className="w-full h-24 flex-col gap-2 card-wavy hover:bg-gradient-to-r from-blue-500 to-indigo-600">
               <Send className="w-6 h-6" />
               <span>Send</span>
             </Button>
           </Link>
           <Link href="/swap" passHref>
-            <Button variant="outline" className="w-full h-24 flex-col gap-2">
+            <Button variant="outline" className="w-full h-24 flex-col gap-2 card-wavy hover:bg-gradient-to-r from-blue-500 to-indigo-600">
               <ArrowRightLeft className="w-6 h-6" />
               <span>Swap</span>
             </Button>
           </Link>
           <Link href="/deposit" passHref>
-            <Button variant="outline" className="w-full h-24 flex-col gap-2">
+            <Button variant="outline" className="w-full h-24 flex-col gap-2 card-wavy hover:bg-gradient-to-r from-blue-500 to-indigo-600">
               <Landmark className="w-6 h-6" />
               <span>Deposit</span>
             </Button>
           </Link>
           <Link href="/wallets" passHref>
-            <Button variant="outline" className="w-full h-24 flex-col gap-2">
+            <Button variant="outline" className="w-full h-24 flex-col gap-2 card-wavy hover:bg-gradient-to-r from-blue-500 to-indigo-600">
               <Wallet className="w-6 h-6" />
               <span>Manage Wallets</span>
             </Button>

@@ -155,7 +155,7 @@ export default function DepositPage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting}>
+            <Button type="submit" className="w-full card-wavy" variant="default" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? "Depositing..." : "Deposit Funds"}
             </Button>

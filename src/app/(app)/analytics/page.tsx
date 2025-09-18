@@ -22,7 +22,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, CircleDollarSign, ArrowRightLeft, Send, Landmark, Transaction } from "lucide-react";
+import { TrendingUp, TrendingDown, CircleDollarSign, ArrowRightLeft, Send, Landmark } from "lucide-react";
 import { TransactionType } from "@/lib/types";
 
 const COLORS = [
@@ -113,7 +113,9 @@ export default function AnalyticsPage() {
       </Card>
       
        <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="card-wavy bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-xl transition-all">
+       
+
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Balance (USD)</CardTitle>
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
@@ -123,7 +125,7 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground">Across all wallets</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-wavy">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income (USD)</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -133,7 +135,7 @@ export default function AnalyticsPage() {
              <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-wavy">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses (USD)</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
@@ -251,7 +253,7 @@ export default function AnalyticsPage() {
               {transactionTypeData.map((item, index) => {
                  const Icon = typeIcons[item.name];
                  return(
-                  <Card key={index} className="flex flex-col items-center justify-center p-4">
+                  <Card key={index} className="card-wavy flex flex-col items-center justify-center p-4">
                      <Icon className="w-8 h-8 mb-2 text-primary" />
                      <p className="text-2xl font-bold">{item.value}</p>
                      <p className="text-sm text-muted-foreground">{item.name}{item.value > 1 ? 's' : ''}</p>

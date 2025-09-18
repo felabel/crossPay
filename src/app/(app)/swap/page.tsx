@@ -89,7 +89,9 @@ export default function SwapPage() {
     calculateRate();
   }, [calculateRate]);
 
+
   async function onSubmit(values: z.infer<typeof swapSchema>) {
+    console.log("Submitting swap:", values);
     const fromWallet = wallets.find((w) => w.id === values.fromWalletId);
     const toWallet = wallets.find((w) => w.id === values.toWalletId);
     
@@ -236,7 +238,7 @@ export default function SwapPage() {
             </div>
              {currentRate && fromWalletId && toWalletId && wallets.find(w => w.id === fromWalletId)?.currency.code !== wallets.find(w => w.id === toWalletId)?.currency.code && <p className="text-sm text-muted-foreground text-center">Exchange Rate: 1 {wallets.find(w => w.id === fromWalletId)?.currency.code} = {currentRate.toFixed(4)} {wallets.find(w => w.id === toWalletId)?.currency.code}</p>}
 
-            <Button type="submit" className="w-full" variant="accent" disabled={isSubmitting || !currentRate}>
+            <Button type="submit" className="w-full" variant="default" disabled={isSubmitting || !currentRate}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? "Swapping..." : "Swap"}
             </Button>

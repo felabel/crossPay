@@ -1,10 +1,13 @@
 // This file mocks a remote API.
 import type { Wallet, Transaction } from "@/lib/types";
-
 // In-memory "database"
 let wallets: Wallet[] = [];
 let transactionIdCounter = 1;
 let walletIdCounter = 1;
+
+export function getWallets(): Wallet[] {
+  return wallets;
+}
 
 // This will be populated by the context with live data
 let liveExchangeRates: Record<string, number> | null = null;
@@ -42,12 +45,16 @@ export async function depositFunds({ walletId, amount }: { walletId: string; amo
 
 export async function swapCurrency({ fromWalletId, toWalletId, amount }: { fromWalletId: string; toWalletId: string; amount: number; }): Promise<{ fromWallet: Wallet, toWallet: Wallet, receivedAmount: number }> {
     await randomDelay();
-    if (shouldFail()) {
-        throw new Error("Currency swap failed due to a network error.");
-    }
-    
+    console.log("from wallet", fromWalletId, "to wallet", toWalletId, "amount", amount, "live rates", liveExchangeRates);
+
+    console.log("all wallers", wallets);
+    // if (shouldFail()) {
+    //     throw new Error("Currency swap failed due to a network error.");
+    // }
+
     const fromWallet = wallets.find(w => w.id === fromWalletId);
     const toWallet = wallets.find(w => w.id === toWalletId);
+
 
     if (!fromWallet || !toWallet) {
         throw new Error("One or both wallets not found.");

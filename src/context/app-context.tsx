@@ -39,7 +39,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// ---- LocalStorage helpers ----
+// LocalStorage helpers 
 const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
   if (typeof window === "undefined") return defaultValue;
   try {
@@ -68,7 +68,7 @@ const saveToStorage = <T,>(key: string, value: T) => {
   }
 };
 
-// ---- Provider ----
+// Provider 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [wallets, setWallets] = useState<Wallet[]>(() =>
     loadFromStorage("wallets", [])
@@ -81,12 +81,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // persist to localStorage
   useEffect(() => {
     saveToStorage("wallets", wallets);
+    setWallets(api.getWallets());
   }, [wallets]);
   useEffect(() => {
     saveToStorage("transactions", transactions);
   }, [transactions]);
 
-  // ---- Transactions ----
+  // Transactions 
   const addTransaction = useCallback(
     async (transaction: Omit<Transaction, "id" | "date">) => {
       const newTx = await api.createTransaction(transaction);
@@ -95,60 +96,79 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  // ---- Rates ----
-  const refreshRates = useCallback(async () => {
-    try {
-      const allCurrencyCodes = currencies.map((c) => c.code);
-      const cryptoCurrencies = currencies
-        .filter((c) => c.isCrypto)
-        .map((c) => c.id);
+  // Rates 
+const refreshRates = useCallback(async () => {
+  try {
+    const allCurrencyCodes = currencies.map((c) => c.code.toUpperCase());
+    const cryptoIds = currencies.filter((c) => c.isCrypto).map((c) => c.id);
 
-      // 1. Fiat (base USD)
-      const fiatResponse = await fetch("https://open.er-api.com/v6/latest/USD");
-      if (!fiatResponse.ok) throw new Error("Failed to fetch fiat rates");
-      const fiatData = await fiatResponse.json();
-      const baseFiatRates = fiatData.rates as Record<string, number>;
-      baseFiatRates["USD"] = 1;
+    // 1) Fetch fiat (rates = units of currency per 1 USD, e.g. EUR: 0.84)
+    const fiatResp = await fetch("https://open.er-api.com/v6/latest/USD");
+    if (!fiatResp.ok) throw new Error("Failed to fetch fiat rates");
+    const fiatJson = await fiatResp.json();
+    const fiatRatesPerUSD = fiatJson.rates as Record<string, number>; // currency-per-USD
 
-      // 2. Crypto (base USD)
-      let cryptoRatesInUSD: Record<string, number> = {};
-      if (cryptoCurrencies.length > 0) {
-        const cryptoResponse = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${cryptoCurrencies.join(
-            ","
-          )}&vs_currencies=usd`
-        );
-        if (!cryptoResponse.ok)
-          throw new Error("Failed to fetch crypto rates");
-        const cryptoData = await cryptoResponse.json();
-        cryptoRatesInUSD = Object.keys(cryptoData).reduce((acc, key) => {
-          const currency = currencies.find((c) => c.id === key);
-          if (currency) acc[currency.code] = cryptoData[key].usd;
-          return acc;
-        }, {} as Record<string, number>);
+    // 2) Fetch crypto (CoinGecko returns USD per 1 crypto)
+    let cryptoUsdPrices: Record<string, number> = {};
+    if (cryptoIds.length > 0) {
+      const cryptoResp = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds.join(",")}&vs_currencies=usd`
+      );
+      if (!cryptoResp.ok) throw new Error("Failed to fetch crypto rates");
+      const cryptoJson = await cryptoResp.json();
+      cryptoUsdPrices = Object.keys(cryptoJson).reduce((acc, id) => {
+        const currency = currencies.find((c) => c.id === id);
+        if (currency && cryptoJson[id]?.usd != null) {
+          acc[currency.code.toUpperCase()] = Number(cryptoJson[id].usd);
+        }
+        return acc;
+      }, {} as Record<string, number>);
+    }
+
+    // 3) Build a normalized map: priceUSDPerUnit[CODE] = USD per 1 unit of CODE
+    const priceUSDPerUnit: Record<string, number> = {};
+    for (const c of currencies) {
+      const code = c.code.toUpperCase();
+      if (code === "USD") {
+        priceUSDPerUnit[code] = 1;
+        continue;
       }
-
-      // 3. Merge
-      const allRatesInUSD = { ...baseFiatRates, ...cryptoRatesInUSD };
-
-      // 4. Build matrix
-      const allRates: LiveRates = {};
-      for (const from of allCurrencyCodes) {
-        for (const to of allCurrencyCodes) {
-          const fromRateUSD = allRatesInUSD[from];
-          const toRateUSD = allRatesInUSD[to];
-          if (fromRateUSD && toRateUSD) {
-            allRates[`${from}-${to}`] = toRateUSD / fromRateUSD;
-          }
+      if (c.isCrypto) {
+        const p = cryptoUsdPrices[code];
+        if (typeof p === "number" && p > 0) priceUSDPerUnit[code] = p;
+      } else {
+        const perUSD = fiatRatesPerUSD[code];
+        if (typeof perUSD === "number" && perUSD > 0) {
+          priceUSDPerUnit[code] = 1 / perUSD; // invert: USD per 1 unit of currency
         }
       }
-
-      setExchangeRates(allRates);
-      api.setLiveRates(allRates);
-    } catch (err) {
-      console.error("Failed to fetch live exchange rates:", err);
     }
-  }, []);
+
+    // (optional debug)
+    // console.log("priceUSDPerUnit:", priceUSDPerUnit);
+
+    // 4) Build full conversion matrix: rate(from->to) = priceUSDPerUnit[from] / priceUSDPerUnit[to]
+    const allRates: LiveRates = {};
+    for (const from of allCurrencyCodes) {
+      const priceFrom = priceUSDPerUnit[from];
+      if (!priceFrom) continue;
+      for (const to of allCurrencyCodes) {
+        const priceTo = priceUSDPerUnit[to];
+        if (!priceTo) continue;
+        allRates[`${from}-${to}`] = priceFrom / priceTo;
+      }
+    }
+
+    // (optional debug)
+    // console.log("sample BTC-USD", allRates["BTC-USD"], "USD-BTC", allRates["USD-BTC"]);
+
+    setExchangeRates(allRates);
+    api.setLiveRates(allRates);
+  } catch (err) {
+    console.error("Failed to fetch live exchange rates:", err);
+  }
+}, []);
+
 
   useEffect(() => {
     refreshRates();
@@ -156,7 +176,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(id);
   }, [refreshRates]);
 
-  // ---- Wallets ----
+  // Wallets 
   const addWallet = async (wallet: Omit<Wallet, "id">) => {
     const newWallet = await api.createWallet(wallet);
     setWallets((prev) => [...prev, newWallet]);

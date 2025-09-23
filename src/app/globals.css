@@ -84,38 +84,33 @@
   }
 }
 
-/* Add this to your main stylesheet */
 
 .card-wavy {
-  /* This is the magic. We create a pseudo-element on top of the card. */
   position: relative;
-  z-index: 1; /* Ensure content is above the pseudo-element */
+  z-index: 1;
 }
 
-/* The pseudo-element for the wavy effect */
 .card-wavy::after {
   content: '';
   position: absolute;
-  inset: 0; /* A shorthand for top, right, bottom, left: 0; */
+  inset: 0;
   background-image: linear-gradient(
     90deg,
     transparent 0%,
     rgba(255, 255, 255, 0.2) 50%,
     transparent 100%
   );
-  background-size: 200% 100%; /* Make the gradient double the width of the card */
-  background-position: -100% 0; /* Start the gradient off-screen to the left */
+  background-size: 200% 100%; 
+  background-position: -100% 0; 
   opacity: 0;
   transition: opacity 0.3s ease-in-out;
 }
 
-/* On hover, show the pseudo-element and start the animation */
 .card-wavy:hover::after {
   opacity: 1;
   animation: wave-effect 2.5s linear infinite;
 }
 
-/* Define the animation keyframes */
 @keyframes wave-effect {
   from {
     background-position: -100% 0; /* Start from the far left */

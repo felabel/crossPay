@@ -88,7 +88,6 @@ export default function WalletsPage() {
         balance: values.balance,
       };
 
-      // We need the ID for the transaction, so we predict it
       const nextId = getNextWalletId();
 
       dispatch(addWallet(newWalletData));

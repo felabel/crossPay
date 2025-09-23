@@ -15,7 +15,7 @@ export const fetchExchangeRates = createAsyncThunk(
       const fiatData = await fiatResponse.json();
       const rawRates = fiatData.rates as Record<string, number>;
 
-      // Invert: API = units per 1 USD → we want USD per 1 unit
+      // Invert: API = units per 1 USD → 
       const fiatRatesInUSD: Record<string, number> = {};
       for (const [code, value] of Object.entries(rawRates)) {
         if (value && value > 0) {

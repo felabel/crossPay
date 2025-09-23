@@ -297,8 +297,6 @@ export default function SwapPage() {
                     ) : (
                         <Input type="number" readOnly value={toAmount > 0 ? toAmount?.toFixed(4) : "0.00"} className="bg-muted" />
                     )}
-                    
-                    {/* <Input type="number" readOnly value={toAmount > 0 ? toAmount?.toFixed(4) : "0.00"} className="bg-muted" /> */}
                   </FormControl>
                   <FormMessage />
               </FormItem>

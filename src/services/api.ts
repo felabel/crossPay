@@ -116,7 +116,7 @@ export async function sendFunds({ fromWalletId, toWalletId, amount }: { fromWall
     fromWallet.balance -= amount;
     
     // In a real app, the recipient's wallet would be updated.
-    // For this mock, we only care about the sender's balance changing.
+    // For this mock,  only care about the sender's balance changing.
 
     return { fromWallet: { ...fromWallet } };
 }

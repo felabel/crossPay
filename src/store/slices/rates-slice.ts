@@ -15,6 +15,8 @@ export const fetchExchangeRates = createAsyncThunk(
       const fiatData = await fiatResponse.json();
       const rawRates = fiatData.rates as Record<string, number>;
 
+      console.log("raw rates", rawRates);
+
       // Invert: API = units per 1 USD → 
       const fiatRatesInUSD: Record<string, number> = {};
       for (const [code, value] of Object.entries(rawRates)) {
@@ -23,6 +25,8 @@ export const fetchExchangeRates = createAsyncThunk(
         }
       }
       fiatRatesInUSD["USD"] = 1;
+
+      console.log("fiatRatesInUSD", fiatRatesInUSD);
 
       // 2. Crypto (base USD → already USD per unit)
       let cryptoRatesInUSD: Record<string, number> = {};
@@ -42,6 +46,7 @@ export const fetchExchangeRates = createAsyncThunk(
       // 3. Merge
       const allRatesInUSD = { ...fiatRatesInUSD, ...cryptoRatesInUSD };
 
+      console.log("allRatesInUSD", allRatesInUSD);
       // 4. Build matrix
       const allRates: LiveRates = {};
       for (const from of allCurrencyCodes) {
@@ -53,6 +58,7 @@ export const fetchExchangeRates = createAsyncThunk(
           }
         }
       }
+      console.log("allRates", allRates);
       return allRates;
     } catch (err: any) {
       console.error("Failed to fetch live exchange rates:", err);
